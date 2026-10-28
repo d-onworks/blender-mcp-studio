@@ -139,14 +139,24 @@ def _finish(info_p: Path, log_p: Path, code: int, wall: float) -> dict:
     return info
 
 
+def require_settings(s: dict, mode: str) -> None:
+    """설정이 비었으면 바로 안내한다 — TripoSG 를 아직 안 깐 사람에게 그림 손질(투명 배경 등)부터 시키지 않게."""
+    if mode == "remote":
+        missing = [k for k in ("host", "remote_dir", "remote_python", "triposg_src") if not s.get(k)]
+        if missing:
+            raise TripoSGError("TripoSG 원격 설정이 비었습니다: " + ", ".join(missing)
+                               + "\n`studio triposg config --mode remote --host … --remote-dir … --remote-python … --triposg-src …` "
+                               "로 넣으세요(docs/07_TripoSG.md 5절).")
+    elif not s.get("triposg_src"):
+        raise TripoSGError("TripoSG 로컬 설정이 비었습니다: triposg_src(공식 저장소를 clone 한 폴더)·python·weights.\n"
+                           "`studio triposg config --mode local --python <파이썬> --triposg-src <폴더> --weights <폴더>` "
+                           "로 넣으세요(docs/07_TripoSG.md 3·5절). GPU 가 다른 PC 에 있으면 --mode remote --host <ssh이름>.")
+
+
 def generate_remote(s: dict, image: Path, name: str, p: dict, local_out: Path, wait_sec: int = 0,
                     timeout: float = 1800) -> dict:
     """s: 원격 설정(host·shell·remote_dir·remote_python·triposg_src·weights·path_prepend·env·busy_mb)."""
-    missing = [k for k in ("host", "remote_dir", "remote_python", "triposg_src") if not s.get(k)]
-    if missing:
-        raise TripoSGError("TripoSG 원격 설정이 비었습니다: " + ", ".join(missing)
-                           + "\n`studio triposg config --mode remote --host … --remote-dir … --remote-python … --triposg-src …` "
-                           "로 넣으세요(docs/07_TripoSG.md 5절).")
+    require_settings(s, "remote")
     host, shell = s["host"], s.get("shell") or "powershell"
     wait_gpu(host, int(s.get("busy_mb") or 2500), wait_sec)
     r_img = _join(s["remote_dir"], f"{name}_input.png", shell)
@@ -190,10 +200,7 @@ def local_env(s: dict) -> dict:
 def generate_local(s: dict, image: Path, name: str, p: dict, local_out: Path, wait_sec: int = 0,
                    timeout: float = 1800) -> dict:
     """s: python(TripoSG 의존성이 깔린 파이썬)·triposg_src·weights·busy_mb."""
-    if not s.get("triposg_src"):
-        raise TripoSGError("TripoSG 로컬 설정이 비었습니다: triposg_src(공식 저장소를 clone 한 폴더)·python·weights.\n"
-                           "`studio triposg config --mode local --python <파이썬> --triposg-src <폴더> --weights <폴더>` "
-                           "로 넣으세요(docs/07_TripoSG.md 3·5절). GPU 가 다른 PC 에 있으면 --mode remote --host <ssh이름>.")
+    require_settings(s, "local")
     wait_gpu(None, int(s.get("busy_mb") or 2500), wait_sec)
     local_out.mkdir(parents=True, exist_ok=True)
     out = str(local_out / name)

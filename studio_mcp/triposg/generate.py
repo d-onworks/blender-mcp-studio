@@ -22,7 +22,7 @@ import time
 from pathlib import Path
 
 from .. import blender_link, config
-from .remote import TripoSGError, generate_local, generate_remote
+from .remote import TripoSGError, generate_local, generate_remote, require_settings
 
 HERE = Path(__file__).resolve().parent
 LICENSE_NOTE = ("TripoSG 핵심 코드(triposg/ 폴더)는 Tencent Hunyuan FlashVDM 라이선스로, 대한민국·EU·영국을 사용 지역에서 "
@@ -106,9 +106,12 @@ def triposg_generate(image: str, name: str | None = None, seed: int = 1, depth: 
     name = name or f"{re.sub(r'[^A-Za-z0-9_]+', '_', img.stem).strip('_') or 'triposg'}_s{seed}"
     out_dir = config.sub("triposg", name)
     s = _settings(settings)
+    mode = default_mode(s)
+    if mode not in ("remote", "local"):
+        raise TripoSGError(f"triposg mode 는 remote·local 중 하나입니다(받은 값: {mode}).")
+    require_settings(s, mode)                         # 설정부터 — 안 깐 사람에게 그림 손질부터 시키지 않는다
     src = _prepare_input(img, crop, out_dir, auto_cutout)
     params = {"seed": seed, "steps": steps, "cfg": cfg, "depth": depth}
-    mode = default_mode(s)
     if mode == "remote":
         info = generate_remote(s, src, name, params, out_dir, wait_sec)
     elif mode == "local":

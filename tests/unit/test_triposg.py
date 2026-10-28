@@ -60,5 +60,20 @@ def test_local_without_config_guides(monkeypatch, tmp_path):
     monkeypatch.setattr(sys, "platform", "win32")
     import pytest
     with pytest.raises(remote.TripoSGError) as e:
-        generate.triposg_generate(str(img), import_to_blender=False)
+        generate.triposg_generate(str(img), import_to_blender=False, auto_cutout=False)
     assert "studio triposg config" in str(e.value)
+
+
+def test_generate_asks_for_settings_before_image_cleanup(tmp_path, monkeypatch):
+    """TripoSG 를 안 깐 사람(윈도우 샌드박스 실측)에게 '투명 배경 그림을 넣으라'보다 설정 안내가 먼저 나와야 한다."""
+    from studio_mcp import config
+    from studio_mcp.triposg import generate
+    import pytest
+    from studio_mcp.triposg.remote import TripoSGError
+    from PIL import Image
+    img = tmp_path / "no_alpha.png"
+    Image.new("RGB", (8, 8), "white").save(img)
+    config.set_value("triposg", {"mode": "local"})
+    with pytest.raises(TripoSGError) as e:
+        generate.triposg_generate(str(img), import_to_blender=False, auto_cutout=False)
+    assert "설정이 비었습니다" in str(e.value)
