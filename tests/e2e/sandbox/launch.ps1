@@ -1,7 +1,8 @@
 ﻿<#
 윈도우 샌드박스를 지금 데스크톱에 로그인한 사용자 세션에서 띄운다(SSH 로 띄우면 세션 0 이라 창이 안 뜬다).
   powershell -ExecutionPolicy Bypass -File launch.ps1                       # C:\bms_sbx\bms.wsb
-  powershell -ExecutionPolicy Bypass -File launch.ps1 -Wsb C:\bms_sbx\bms_novgpu.wsb   # 가상 GPU 끈 판(<VGpu>Disable</VGpu>)
+  powershell -ExecutionPolicy Bypass -File launch.ps1 -Wsb C:\bms_sbx\다른설정.wsb   # 다른 .wsb
+  ※ <VGpu>Disable</VGpu> 는 샌드박스 0.8.107 이 무시한다(2026-10-28 실측) — GPU 없는 PC 재현에 못 쓴다.
 샌드박스는 한 번에 하나만 뜬다. 다 쓰면 Unregister-ScheduledTask -TaskName bms_sandbox.
 #>
 param([string]$Wsb = "C:\bms_sbx\bms.wsb")

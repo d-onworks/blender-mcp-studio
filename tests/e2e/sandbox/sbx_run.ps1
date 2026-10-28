@@ -36,12 +36,14 @@ P ("ENV winget=" + $info.winget + " git=" + $info.git + " gpu=" + ($info.gpu -jo
 
 $sac0 = (Get-ItemProperty HKLM:\SYSTEM\CurrentControlSet\Control\CI\Policy -ErrorAction SilentlyContinue).VerifiedAndReputablePolicyState
 P "SAC(스마트 앱 컨트롤 0=꺼짐 1=켜짐 2=평가)=$sac0"
-if ($cfg.sac_off -eq "1" -and $sac0 -ne 0) {
+function Sac-Off {
     # 일회용 샌드박스 안에서만 끈다(호스트와 무관, 닫으면 사라짐)
     reg.exe add HKLM\SYSTEM\CurrentControlSet\Control\CI\Policy /v VerifiedAndReputablePolicyState /t REG_DWORD /d 0 /f | Out-Null
     $r = (& CiTool.exe --refresh --json 2>&1 | Out-String).Trim()
     P ("SAC-OFF 샌드박스 안에서 끔 → " + (Get-ItemProperty HKLM:\SYSTEM\CurrentControlSet\Control\CI\Policy).VerifiedAndReputablePolicyState + " citool=" + ($r -replace "\s+", " "))
 }
+# sac_check=1 이면 켠 채로 설치를 먼저 한 번 돌려 멈춤 안내를 확인한 뒤 끈다(저장소를 받은 다음)
+if ($cfg.sac_off -eq "1" -and $cfg.sac_check -ne "1" -and $sac0 -ne 0) { Sac-Off }
 if ($cfg.skip_main -eq "1") { P "SKIP-MAIN"; "skip" | Out-File "$out\DONE" }
 else {
 # 0) 저장소 받기 — 진짜 첫 사용자 경로: git 이 있으면 clone, 없으면 GitHub zip
@@ -61,11 +63,22 @@ try {
         $x = Join-Path $env:TEMP "bms_x"; New-Item -ItemType Directory -Force $x | Out-Null
         tar.exe -xf $zip -C $x
         Move-Item (Join-Path $x "blender-mcp-studio-main") $repo
-        P "REPO github zip $(Sec $t0)s"
+        # GitHub 아카이브 zip 은 끝에 커밋 해시(40자)를 주석으로 넣는다 — 어느 커밋을 받았는지 남긴다
+        $bytes = [IO.File]::ReadAllBytes($zip)
+        $sha = [Text.Encoding]::ASCII.GetString($bytes, $bytes.Length - 40, 40)
+        P "REPO github zip $(Sec $t0)s commit=$sha"
     }
 } catch { P "REPO FAIL $_" }
 if (-not (Test-Path "$repo\install\install_win.ps1")) { P "REPO FAIL install_win.ps1 없음"; "x" | Out-File "$out\DONE" }
 else {
+    if ($cfg.sac_check -eq "1" -and $sac0 -eq 1) {
+        $t0 = Get-Date
+        $c = Save "install_sac_on.txt" { powershell -NoProfile -ExecutionPolicy Bypass -File "$repo\install\install_win.ps1" }
+        $msg = Select-String -Path "$out\install_sac_on.txt" -Pattern "스마트 앱 컨트롤" -SimpleMatch -Quiet
+        $blender = Test-Path "$env:LOCALAPPDATA\Programs\Blender"
+        P "1-SAC-ON install exit=$c $(Sec $t0)s 안내=$msg 블렌더받음=$blender"
+        if ($cfg.sac_off -eq "1") { Sac-Off }
+    }
     # 1) 설치 — 드라이런 → 실제 → 다시 한 번(이미 된 단계 건너뛰기)
     $t0 = Get-Date
     $c = Save "install_dryrun.txt" { powershell -NoProfile -ExecutionPolicy Bypass -File "$repo\install\install_win.ps1" -DryRun }

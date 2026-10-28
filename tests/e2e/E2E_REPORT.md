@@ -125,13 +125,13 @@ STUDIO_E2E=1 uv run --group dev pytest tests/e2e -q        # 실제 계정·블�
 | 처음부터 없는 것 | winget · git · 파이썬 · uv · claude · codex · nvidia-smi(CUDA) — 저장소는 GitHub zip 으로 받음 |
 | 처음부터 있는 것 | curl · tar · 엣지(로그인 창 브라우저로 그대로 씀) |
 | **스마트 앱 컨트롤** | **켜짐(값 1)** — 새 윈도우 11 의 보안 기능. 서명 없는 실행 파일·DLL 을 막는다(아래 S1) |
-| 가상 GPU | 장치 목록엔 그래픽카드가 보이지만 CUDA 는 없다. 블렌더가 쓰는 OpenGL 은 **기동마다 다르다** — run04 는 OpenGL 4.6 이 살아 있었고 run03 은 없었다. run05 는 가상 GPU 를 아예 끄고(`<VGpu>Disable</VGpu>`) GPU 없는 PC 를 재현했다 |
+| 가상 GPU | 장치 목록엔 그래픽카드가 보이지만 CUDA 는 없다. 블렌더가 쓰는 OpenGL 은 **기동마다 다르다** — 그래픽 됨: run04·run08, 안 됨: run03·run05·run07. ※ 처음엔 run05 를 `<VGpu>Disable</VGpu>` 로 "GPU 없는 PC" 를 재현했다고 적었지만, run08 에서 확인해 보니 이 샌드박스 판(0.8.107)은 그 설정을 **무시한다**(그래픽카드가 그대로 붙고 OpenGL 4.6 이 됨). run05 가 "안 됨" 이었던 것은 설정 때문이 아니라 기동마다 달라서였다 |
 | 계정 | 맥에서 저장한 토큰 파일을 매핑 폴더로 넣고, 샌드박스 스크립트가 샌드박스 홈으로 복사한 즉시 매핑 폴더 쪽을 지웠다(값은 어디에도 출력하지 않음). 시험 뒤 호스트 쪽 사본 0개 확인 |
 | 띄우는 방법 | 호스트 폴더 하나를 `C:\share` 로 매핑하고, `LogonCommand` 로 `tests/e2e/sandbox/sbx_run.ps1` 을 자동 실행했다. 원격 셸로 띄우면 창이 안 뜨는 세션이라, 로그인한 사용자 세션의 예약 작업으로 띄웠다(`launch.ps1`) |
 
 ## 최종 통과표 (수정판)
 
-| 단계 | 내용 | run04 · 가상 GPU 켬 | run05 · GPU 없음 |
+| 단계 | 내용 | run04 · 그래픽 됨 | run05 · 그래픽 안 됨 |
 |---|---|---|---|
 | 0 | GitHub zip 으로 저장소 받기(git 없음) | 통과(2초) — run04~06 은 아직 안 올린 수정판 묶음으로 같은 자리에 풂 | 통과 |
 | 1 | `install_win.ps1 -DryRun` → 실제 설치 → 한 번 더 → `studio status` | **통과** — 36초, 다시 돌리면 4초. 블렌더 zip(공식 sha256 일치)·uv·애드온·studio·브라우저(엣지). claude·codex 없음 → 안내하고 건너뜀 | **통과** — 38초 / 4초 |
@@ -154,21 +154,21 @@ STUDIO_E2E=1 uv run --group dev pytest tests/e2e -q        # 실제 계정·블�
 | run02 17:25 | 진단만 | 켜진 상태에선 블렌더 `--version` 부터 실패, 샌드박스 안에서만 끄니(레지스트리 + `CiTool --refresh`, 재부팅 없음) 블렌더·uv 파이썬 정상 |
 | run03 17:27 | 공개 저장소 그대로 · 샌드박스 안 스마트 앱 컨트롤 끔 | 1~4a·6 통과, **4b·4c·4d·7 실패**(S2), TripoSG 안내 순서(S3) |
 | run04 17:49 | 수정판 · 가상 GPU 켬 | 전부 통과(이번 기동은 OpenGL 이 살아 있어 워크벤치로 그림) |
-| run05 18:14 | 수정판 · 가상 GPU 끔 | 전부 통과 — 자동 감지 후 대체 경로 |
+| run05 18:14 | 수정판 · (VGpu=Disable, 실제로는 무시됨) 그래픽 안 됨 | 전부 통과 — 자동 감지 후 대체 경로 |
 | run06 18:25 | 수정판 · 스마트 앱 컨트롤 켬 | 설치가 안내 후 멈춤(의도한 동작) |
 
 | # | 실패 | 근본 원인 | 고친 곳 | 다시 시험 |
 |---|---|---|---|---|
 | S1 | 설치가 애드온 단계에서 `uvx` "애플리케이션 제어 정책에서 이 파일을 차단(os error 4551)" 으로 죽음. 다시 돌리면 400MB 블렌더를 또 받음 | 스마트 앱 컨트롤이 켜짐(코드 무결성 이벤트 3077·3033). 실측으로 막힌 것: uv 가 받는 파이썬 3.12·3.13·3.14·3.15 **전부**, python.org 3.14.10 설치 파일의 PythonBA.dll, **블렌더 5.2.3 공식 zip 의 DLL 61개 전부(서명 없음) → blender.exe 가 0xC0E90002 로 안 뜸**. 파이썬 버전을 고정하거나 서명된 파이썬을 써도 피할 수 없다. 또 받는 이유는, 찾기 단계가 `--version` 실패를 "블렌더 없음" 으로 봤기 때문 | `install_win.ps1`: 1단계에서 상태를 읽어, 켜져 있으면 이유와 선택지를 보여 주고 `exit 3`(`-IgnoreSmartAppControl` 로 건너뜀, 드라이런은 계속 보여 줌). 이미 풀어 둔 블렌더가 실행 안 되면 다시 받지 않고 이유를 알림. 받은 직후 실행 확인. 명령 출력에 4551 이 있으면 안내를 덧붙임. `docs/01` "자주 막히는 곳" | run06 에서 2초 만에 안내 후 멈춤 |
-| S2 | 백그라운드 스크린샷 · `mixamo rig/animate` · 4d 프레임 · MCP `blender_screenshot` 에서 블렌더가 비정상 종료(0xC0000005) | OpenGL 문맥을 못 만드는 PC 에서 블렌더 5.2.3 은 오류 대신 **워크벤치 렌더 시작에서 죽는다**(크래시 기록: `GPU_fence_signal` ← `DRW_gpu_context_create` ← `WM_init_gpu` ← `RE_engine_render`). A/B: 장면 열기·저장·Cycles CPU 렌더는 정상이고 워크벤치만 죽는다. 믹사모 리깅은 정면 미리보기를 워크벤치로 그려서 함께 죽었다. 같은 샌드박스라도 기동마다 OpenGL 이 살거나 죽는다 | `blender_link.gpu_draw_ok()`: 따로 띄운 블렌더로 16×16 워크벤치 렌더를 한 번 해 보고 실행 파일별로 기억(죽어도 본 작업과 무관). 그림을 그리는 작업에만 `STUDIO_GPU_DRAW=0` 을 넘겨 `screenshot`·`mixamo_prep` 이 **Cycles CPU**(어두운 하늘빛 + 해 조명 하나)로 대신 그림. `studio status` 에 `blender.headless_draw` 와 참고 문구. E2E 프레임 렌더도 같은 대체 경로 | run05(GPU 없음)에서 자동 감지 후 전 단계 통과. 맥에서 강제로 대체 경로를 돌려 그림 확인. 단위 시험 2건 |
+| S2 | 백그라운드 스크린샷 · `mixamo rig/animate` · 4d 프레임 · MCP `blender_screenshot` 에서 블렌더가 비정상 종료(0xC0000005) | OpenGL 문맥을 못 만드는 PC 에서 블렌더 5.2.3 은 오류 대신 **워크벤치 렌더 시작에서 죽는다**(크래시 기록: `GPU_fence_signal` ← `DRW_gpu_context_create` ← `WM_init_gpu` ← `RE_engine_render`). A/B: 장면 열기·저장·Cycles CPU 렌더는 정상이고 워크벤치만 죽는다. 믹사모 리깅은 정면 미리보기를 워크벤치로 그려서 함께 죽었다. 같은 샌드박스라도 기동마다 OpenGL 이 살거나 죽는다 | `blender_link.gpu_draw_ok()`: 따로 띄운 블렌더로 16×16 워크벤치 렌더를 한 번 해 보고 실행 파일별로 기억(죽어도 본 작업과 무관). 그림을 그리는 작업에만 `STUDIO_GPU_DRAW=0` 을 넘겨 `screenshot`·`mixamo_prep` 이 **Cycles CPU**(어두운 하늘빛 + 해 조명 하나)로 대신 그림. `studio status` 에 `blender.headless_draw` 와 참고 문구. E2E 프레임 렌더도 같은 대체 경로 | run05(그래픽 안 됨)에서 자동 감지 후 전 단계 통과. 맥에서 강제로 대체 경로를 돌려 그림 확인. 단위 시험 2건 |
 | S3 | TripoSG 를 안 깐 상태에서 `triposg generate` 가 "투명 배경 그림을 넣으라" 부터 말함 | 그림 준비가 설정 확인보다 먼저 | `require_settings()` 로 모아 그림 준비 전에 부름 | run05 에서 설정 안내가 먼저 나옴. 단위 시험 1건(수정 전 실패 확인) |
 | S4 | (시험 장치) `sweep.ps1` 2단계가 `studio` 가 아예 없어도 PASS | 빈 값끼리 비교 | 판정에 상태 결과가 있어야 한다는 조건 추가 | run01 재현 → run04~05 정상 |
 
 ## 증거 그림 (`tests/e2e/evidence/`)
 | 파일 | 무엇 |
 |---|---|
-| `sbx_vgpu_vs_nogpu.jpg` | 같은 장면 스크린샷 — 왼쪽 run04 워크벤치(가상 GPU), 오른쪽 run05 Cycles CPU 대체(GPU 없음). 차는 "Cartoon Sports Car" by RCC Design (CC BY 4.0) |
-| `sbx_nogpu_car_cycles_cpu.jpg` | run05 `studio --headless screenshot` (GPU 없음 → Cycles CPU) |
+| `sbx_vgpu_vs_nogpu.jpg` | 같은 장면 스크린샷 — 왼쪽 run04 워크벤치(그래픽 됨), 오른쪽 run05 Cycles CPU 대체(그래픽 안 됨). 차는 "Cartoon Sports Car" by RCC Design (CC BY 4.0) |
+| `sbx_nogpu_car_cycles_cpu.jpg` | run05 `studio --headless screenshot` (그래픽 안 됨 → Cycles CPU) |
 | `sbx_nogpu_markers.jpg` | run05 `mixamo rig` 정면 미리보기 + 자동 마커 8개(턱·팔꿈치·손목·무릎·사타구니) — 대체 경로에서도 몸 위에 그대로 |
 | `sbx_nogpu_cross_punch.jpg` | run05 Cross Punch 1·16·25·49 프레임 — 가드 → 뻗기 → 복귀 |
 
@@ -180,10 +180,34 @@ STUDIO_E2E=1 uv run --group dev pytest tests/e2e -q        # 실제 계정·블�
 - 샌드박스에 claude·codex 가 없어서 MCP 등록 단계는 "안내하고 건너뛰기" 만 확인했다.
 - 믹사모 계정에 시험 캐릭터 2개(`e2e_Hero`, run04·run05)가 더 올라갔다. run03 은 업로드 전에 죽어서 0개다.
 - run01 기동이 시험을 마친 직후 가상머신이 스스로 꺼졌다(종료 코드 0xC0370103). 원인은 확인하지 못했고, 다시 띄워서 이어 갔다.
-- run04~06 은 **아직 GitHub 에 올리지 않은 수정판 묶음**으로 돌렸다. 푸시한 뒤에 GitHub zip 경로로 한 번 더 돌려 확인해야 한다(`run.txt` 의 `source=github`).
+- run04~06 은 GitHub 에 올리기 전의 수정판 묶음으로 돌렸다 → 푸시 뒤 공개본으로 다시 확인했다(아래 절).
 
 ## 샌드박스에서 다시 돌리는 법 (`tests/e2e/sandbox/`)
-1. 호스트에 `C:\bms_sbx\bms.wsb`(이 폴더의 `bms.wsb`)를 두고 `C:\bms_sbx\share\` 에 `sbx_run.ps1` 과 `run.txt` 를 넣는다. `run.txt` 의 줄은 `run=run07` · `source=github`(또는 `local` = `share\src\repo.tar`) · `idle_min=40` · `sac_off=1`(샌드박스 안에서만 스마트 앱 컨트롤 끄기) · `skip_main=1`(진단만).
+1. 호스트에 `C:\bms_sbx\bms.wsb`(이 폴더의 `bms.wsb`)를 두고 `C:\bms_sbx\share\` 에 `sbx_run.ps1` 과 `run.txt` 를 넣는다. `run.txt` 의 줄은 `run=run09` · `source=github`(또는 `local` = `share\src\repo.tar`) · `idle_min=40` · `sac_off=1`(샌드박스 안에서만 스마트 앱 컨트롤 끄기) · `sac_check=1`(끄기 전에 켠 채로 설치를 한 번 돌려 멈춤 안내 확인) · `skip_main=1`(진단만). GitHub zip 으로 받으면 받은 커밋 해시가 `progress.log` 에 찍힌다.
 2. 계정을 시험하려면 토큰 파일을 `share\cred\credentials.json` 에 넣는다. 샌드박스가 복사한 뒤 바로 지운다.
-3. `powershell -ExecutionPolicy Bypass -File launch.ps1` 로 띄운다(GPU 없는 PC 재현은 `-Wsb` 로 `<VGpu>Disable</VGpu>` 판).
+3. `powershell -ExecutionPolicy Bypass -File launch.ps1` 로 띄운다. (`<VGpu>Disable</VGpu>` 는 샌드박스 0.8.107 이 무시하므로 GPU 없는 PC 재현에 쓰지 못한다 — 그래픽 가능 여부는 `progress.log` 의 `headless_draw` 로 본다.)
 4. 결과는 `share\out\<run>\progress.log`(STEP n PASS/FAIL 한 줄씩)와 로그·그림이다. 끝난 뒤에도 `idle_min` 분 동안 `share\cmd\*.ps1` 을 받아 실행한다(원인 조사용). `share\cmd\shutdown` 파일을 만들면 닫힌다.
+
+## 공개본 기준 확인 — GitHub main zip, 커밋 `f8dffc5` (2026-10-28 저녁)
+
+`f8dffc5` 를 GitHub 에 올린 뒤, 샌드박스 안에서 **GitHub main zip 을 직접 받아** 다시 돌렸다. 로컬 묶음은 매핑 폴더 밖으로 치워 쓰일 수 없게 했다. 받은 zip 끝에 GitHub 가 넣는 커밋 해시를 읽어 `f8dffc5b5ef8…` 임을 확인했다. 스마트 앱 컨트롤은 처음엔 켠 채로 설치를 돌려 멈춤을 확인했고, 그다음 샌드박스 안에서만 끄고 나머지를 진행했다.
+
+| 단계 | run07 · 그래픽 안 됨 | run08 · 그래픽 됨 |
+|---|---|---|
+| 0 GitHub main zip 받기 | 통과 · 3초 · commit `f8dffc5b5ef82874d24aaae41a41542cc23a5157` | 통과 · 2초 · 같은 커밋 |
+| 스마트 앱 컨트롤 켠 채 설치 | **3초 만에 안내하고 종료 코드 3, 블렌더 안 받음** | 같음 |
+| 1 드라이런 → 설치 → 한 번 더 → status | 통과 · 68초 / 4초 | 통과 · 46초 / 4초 |
+| 1a~1d | 통과 | 통과 |
+| 2 계정 | 통과 · `headless_draw=False` | 통과 · `headless_draw=True` |
+| 3 스케치팹 검색 · `import 1 --size 4.5` | 통과 · 3초 / 6초 · 4.5×4.48×1.1m | 통과 · 4초 / 6초 |
+| 4 믹사모 search · rig · animate · 프레임 | 통과 · 리깅 46초·뼈 33 · 동작 7초·49프레임(Cycles CPU 대체) | 통과 · 리깅 44초·뼈 33 · 동작 7초·49프레임(워크벤치) |
+| 5 TripoSG | 건너뜀(설계대로) — check 가 nvidia-smi 없음·설정 없음 안내, generate 는 설정 안내부터 | 같음 |
+| 6 render plan · dist --dry-run | 통과 | 통과 |
+| 7 MCP `studio serve`(도구 16개 · 상태 · 검색 · 렌더 계획 · ping · 스크린샷) | 통과 | 통과 |
+
+**공개본 그대로 실패한 단계는 없었다.** 두 회차가 우연히 그래픽 됨과 안 됨으로 갈려, 두 그리기 경로를 모두 공개본으로 확인했다.
+
+### 확인하다 고친 것 (로컬 커밋, 아직 안 올림)
+| # | 문제 | 근본 원인 | 고친 곳 | 확인 |
+|---|---|---|---|---|
+| S5 | (잠재 위험) 그래픽 가능 여부를 블렌더 실행 파일 기준으로만 기억했다. 한 번 "됨" 으로 기억하면 나중에 그래픽이 없는 세션(원격 데스크톱 등)에서 워크벤치로 그리다 블렌더가 다시 죽을 수 있다 | 오늘 실측에서 같은 기계·같은 설정이라도 기동마다 결과가 바뀌었다(run04·08 됨, run05·07 안 됨) | `blender_link._boot_session()`: 기억하는 열쇠에 윈도우 부팅 시각(분 단위)과 세션 이름(Console / RDP-Tcp#n)을 넣어, 재부팅하거나 접속 방식이 바뀌면 다시 시험한다 | 단위 시험 1건(세션이 바뀌면 다시 시험). run08 샌드박스에서 부팅 시각이 일정하게 읽히고, 두 번째 `status` 는 기억한 값을 씀(0초) |
