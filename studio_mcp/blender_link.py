@@ -137,12 +137,30 @@ bpy.ops.render.render(write_still=True)
 """
 
 
+def _boot_session() -> str:
+    """윈도우: 부팅 시각(분 단위)·세션 이름(Console / RDP-Tcp#n). 다른 운영체제는 빈 문자열(GPU 가 바뀔 일이 드물다)."""
+    if os.name != "nt":
+        return ""
+    try:
+        import ctypes
+        import time
+        tick = ctypes.windll.kernel32.GetTickCount64
+        tick.restype = ctypes.c_ulonglong              # 기본 반환형(int)이면 49일마다 잘린다
+        up = tick() / 1000.0
+        boot = int((time.time() - up) // 60)
+    except (AttributeError, OSError):
+        boot = 0
+    return f"{boot}|{os.environ.get('SESSIONNAME', '')}"
+
+
 def gpu_draw_ok(exe: Path | None = None) -> bool | None:
     """백그라운드 블렌더가 그래픽(OpenGL) 문맥을 만들 수 있는지 = 워크벤치·EEVEE 렌더가 되는지.
 
     GPU 가 없거나 가상 GPU 뿐이면(윈도우 샌드박스·원격 서버·가상머신) 블렌더 5.2 는 오류를 내지 않고
     GPU_fence_signal 에서 죽는다(2026-10-28 윈도우 샌드박스 실측: 워크벤치 렌더 = 0xC0000005, Cycles CPU = 정상).
-    그래서 따로 띄운 블렌더로 16×16 워크벤치 렌더를 한 번 해 보고, 결과를 블렌더 실행 파일별로 기억한다.
+    그래서 따로 띄운 블렌더로 16×16 워크벤치 렌더를 한 번 해 보고, 결과를 기억한다.
+    같은 PC 라도 기동·접속 방식마다 달라진다(샌드박스 기동마다 됐다 안 됐다, 원격 데스크톱 세션) — 그래서
+    블렌더 실행 파일 + 윈도우 부팅 시각 + 세션 종류(콘솔/원격)가 같을 때만 기억한 값을 쓴다.
     환경변수 STUDIO_GPU_DRAW=0/1 이 있으면 시험 없이 그 값을 쓴다. 블렌더가 없으면 None.
     """
     forced = os.environ.get(GPU_DRAW_ENV)
@@ -152,7 +170,7 @@ def gpu_draw_ok(exe: Path | None = None) -> bool | None:
     if not exe or not exe.is_file():
         return None
     st = exe.stat()
-    key = f"{exe}|{st.st_size}|{int(st.st_mtime)}"
+    key = f"{exe}|{st.st_size}|{int(st.st_mtime)}|{_boot_session()}"
     cache = config.sub("cache") / "gpu_draw.json"
     try:
         d = json.loads(cache.read_text(encoding="utf-8"))

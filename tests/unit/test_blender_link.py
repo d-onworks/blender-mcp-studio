@@ -142,3 +142,23 @@ def test_gpu_draw_env_override(monkeypatch):
     assert blender_link.gpu_draw_ok() is True
     monkeypatch.setenv(blender_link.GPU_DRAW_ENV, "0")
     assert blender_link.gpu_draw_ok() is False
+
+
+def test_gpu_draw_cache_follows_boot_and_session(monkeypatch, tmp_path):
+    """같은 PC 라도 재부팅·원격 접속이면 그래픽 문맥이 달라진다 — 기억한 값을 그대로 쓰지 않고 다시 시험한다."""
+    exe = tmp_path / "blender"
+    exe.write_text("")
+    monkeypatch.delenv(blender_link.GPU_DRAW_ENV, raising=False)
+    probes = []
+
+    class Ok:
+        returncode = 0
+        stdout = stderr = b""
+    monkeypatch.setattr(blender_link.subprocess, "run", lambda cmd, **k: probes.append(cmd) or Ok())
+    monkeypatch.setattr(blender_link, "_boot_session", lambda: "boot1|Console")
+    blender_link.gpu_draw_ok(exe)
+    blender_link.gpu_draw_ok(exe)
+    assert len(probes) == 1
+    monkeypatch.setattr(blender_link, "_boot_session", lambda: "boot1|RDP-Tcp#3")
+    blender_link.gpu_draw_ok(exe)
+    assert len(probes) == 2
