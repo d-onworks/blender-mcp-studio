@@ -1,0 +1,17 @@
+<Configuration>
+  <VGpu>Default</VGpu>
+  <Networking>Default</Networking>
+  <MemoryInMB>8192</MemoryInMB>
+  <ClipboardRedirection>Disable</ClipboardRedirection>
+  <PrinterRedirection>Disable</PrinterRedirection>
+  <MappedFolders>
+    <MappedFolder>
+      <HostFolder>C:\bms_sbx\share</HostFolder>
+      <SandboxFolder>C:\share</SandboxFolder>
+      <ReadOnly>false</ReadOnly>
+    </MappedFolder>
+  </MappedFolders>
+  <LogonCommand>
+    <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\share\sbx_run.ps1</Command>
+  </LogonCommand>
+</Configuration>

@@ -110,3 +110,80 @@ powershell -ExecutionPolicy Bypass -File tests\e2e\win\sweep.ps1 -Work C:\e2e\ru
 uv run pytest                                              # 단위 81건
 STUDIO_E2E=1 uv run --group dev pytest tests/e2e -q        # 실제 계정·블렌더(백그라운드)
 ```
+
+---
+
+# 윈도우 샌드박스 시험 — 2026-10-28 오후
+
+위 시험은 이미 쓰던 PC 의 새 폴더에서 했다. 이번에는 **윈도우 샌드박스**에서 했다. 켤 때마다 새로 깔린 상태로 시작하고 닫으면 사라지는 일회용 윈도우다. 그 안에서 **공개 저장소를 GitHub zip 으로 받는 것부터** 처음 쓰는 사람처럼 따라갔다. 실패하면 원인을 찾아 고치고 처음부터 다시 돌렸고, 모든 단계가 통과할 때까지 되풀이했다(6회 기동).
+
+## 시험 환경
+
+| 항목 | 값 |
+|---|---|
+| 샌드박스 | Windows 11(빌드 26200) 일회용, 계정 WDAGUtilityAccount, 메모리 8GB, PowerShell 5.1 |
+| 처음부터 없는 것 | winget · git · 파이썬 · uv · claude · codex · nvidia-smi(CUDA) — 저장소는 GitHub zip 으로 받음 |
+| 처음부터 있는 것 | curl · tar · 엣지(로그인 창 브라우저로 그대로 씀) |
+| **스마트 앱 컨트롤** | **켜짐(값 1)** — 새 윈도우 11 의 보안 기능. 서명 없는 실행 파일·DLL 을 막는다(아래 S1) |
+| 가상 GPU | 장치 목록엔 그래픽카드가 보이지만 CUDA 는 없다. 블렌더가 쓰는 OpenGL 은 **기동마다 다르다** — run04 는 OpenGL 4.6 이 살아 있었고 run03 은 없었다. run05 는 가상 GPU 를 아예 끄고(`<VGpu>Disable</VGpu>`) GPU 없는 PC 를 재현했다 |
+| 계정 | 맥에서 저장한 토큰 파일을 매핑 폴더로 넣고, 샌드박스 스크립트가 샌드박스 홈으로 복사한 즉시 매핑 폴더 쪽을 지웠다(값은 어디에도 출력하지 않음). 시험 뒤 호스트 쪽 사본 0개 확인 |
+| 띄우는 방법 | 호스트 폴더 하나를 `C:\share` 로 매핑하고, `LogonCommand` 로 `tests/e2e/sandbox/sbx_run.ps1` 을 자동 실행했다. 원격 셸로 띄우면 창이 안 뜨는 세션이라, 로그인한 사용자 세션의 예약 작업으로 띄웠다(`launch.ps1`) |
+
+## 최종 통과표 (수정판)
+
+| 단계 | 내용 | run04 · 가상 GPU 켬 | run05 · GPU 없음 |
+|---|---|---|---|
+| 0 | GitHub zip 으로 저장소 받기(git 없음) | 통과(2초) — run04~06 은 아직 안 올린 수정판 묶음으로 같은 자리에 풂 | 통과 |
+| 1 | `install_win.ps1 -DryRun` → 실제 설치 → 한 번 더 → `studio status` | **통과** — 36초, 다시 돌리면 4초. 블렌더 zip(공식 sha256 일치)·uv·애드온·studio·브라우저(엣지). claude·codex 없음 → 안내하고 건너뜀 | **통과** — 38초 / 4초 |
+| 1a~1d | 기본 위치에서 블렌더 찾기 · 애드온·브라우저 · 백그라운드 ping · `codex-config` | 통과 | 통과 |
+| 2 | 계정(토큰 파일) | 통과 · `headless_draw=True` | 통과 · **`headless_draw=False`** (자동 감지) |
+| 3 | 스케치팹 검색 → 콘택트시트 → `import 1 --size 4.5` | **통과** — 3초 / 6초, 4.5×4.48×1.1m | **통과** — 4초 / 6초 |
+| 4 | 믹사모 검색 → `rig`(사람형) → `animate`(Cross Punch) → 프레임 렌더 | **통과** — 리깅 48초·뼈 33, 동작 6초·49프레임 | **통과** — 리깅 39초, 동작 7초·49프레임. 미리보기·스크린샷은 Cycles CPU 로 대신 그림 |
+| 5 | TripoSG | **건너뜀(설계대로)** — `triposg check` 가 "nvidia-smi 없음 + triposg_src 설정 없음" 을 알려 주고 실패 코드. `generate` 는 설정 안내부터(S3) | 같음 |
+| 6 | `render plan` · `render dist --dry-run` | 통과 | 통과 |
+| 7 | MCP 클라이언트로 `studio serve` — 도구 16개 · `studio_status` · 스케치팹·믹사모 검색(그림 포함) · `render_plan` · `render_job_status` · `blender_ping` · `blender_screenshot` | **통과** | **통과**(스크린샷은 Cycles CPU) |
+| — | 스마트 앱 컨트롤을 켠 채 설치(run06) | 2초 만에 이유·선택지를 보여 주고 **종료 코드 3** 으로 멈춤(블렌더를 받지 않음) | — |
+
+맥 단위 시험 84건 통과(새 시험 3건 포함).
+
+## 회차별 기록 (시각 KST)
+
+| 회차 | 무엇 | 결과 |
+|---|---|---|
+| run01 17:11 | 공개 저장소 그대로 · 스마트 앱 컨트롤 켜짐 | 설치 실패(S1). 다시 돌리니 블렌더를 또 받음 |
+| run02 17:25 | 진단만 | 켜진 상태에선 블렌더 `--version` 부터 실패, 샌드박스 안에서만 끄니(레지스트리 + `CiTool --refresh`, 재부팅 없음) 블렌더·uv 파이썬 정상 |
+| run03 17:27 | 공개 저장소 그대로 · 샌드박스 안 스마트 앱 컨트롤 끔 | 1~4a·6 통과, **4b·4c·4d·7 실패**(S2), TripoSG 안내 순서(S3) |
+| run04 17:49 | 수정판 · 가상 GPU 켬 | 전부 통과(이번 기동은 OpenGL 이 살아 있어 워크벤치로 그림) |
+| run05 18:14 | 수정판 · 가상 GPU 끔 | 전부 통과 — 자동 감지 후 대체 경로 |
+| run06 18:25 | 수정판 · 스마트 앱 컨트롤 켬 | 설치가 안내 후 멈춤(의도한 동작) |
+
+| # | 실패 | 근본 원인 | 고친 곳 | 다시 시험 |
+|---|---|---|---|---|
+| S1 | 설치가 애드온 단계에서 `uvx` "애플리케이션 제어 정책에서 이 파일을 차단(os error 4551)" 으로 죽음. 다시 돌리면 400MB 블렌더를 또 받음 | 스마트 앱 컨트롤이 켜짐(코드 무결성 이벤트 3077·3033). 실측으로 막힌 것: uv 가 받는 파이썬 3.12·3.13·3.14·3.15 **전부**, python.org 3.14.10 설치 파일의 PythonBA.dll, **블렌더 5.2.3 공식 zip 의 DLL 61개 전부(서명 없음) → blender.exe 가 0xC0E90002 로 안 뜸**. 파이썬 버전을 고정하거나 서명된 파이썬을 써도 피할 수 없다. 또 받는 이유는, 찾기 단계가 `--version` 실패를 "블렌더 없음" 으로 봤기 때문 | `install_win.ps1`: 1단계에서 상태를 읽어, 켜져 있으면 이유와 선택지를 보여 주고 `exit 3`(`-IgnoreSmartAppControl` 로 건너뜀, 드라이런은 계속 보여 줌). 이미 풀어 둔 블렌더가 실행 안 되면 다시 받지 않고 이유를 알림. 받은 직후 실행 확인. 명령 출력에 4551 이 있으면 안내를 덧붙임. `docs/01` "자주 막히는 곳" | run06 에서 2초 만에 안내 후 멈춤 |
+| S2 | 백그라운드 스크린샷 · `mixamo rig/animate` · 4d 프레임 · MCP `blender_screenshot` 에서 블렌더가 비정상 종료(0xC0000005) | OpenGL 문맥을 못 만드는 PC 에서 블렌더 5.2.3 은 오류 대신 **워크벤치 렌더 시작에서 죽는다**(크래시 기록: `GPU_fence_signal` ← `DRW_gpu_context_create` ← `WM_init_gpu` ← `RE_engine_render`). A/B: 장면 열기·저장·Cycles CPU 렌더는 정상이고 워크벤치만 죽는다. 믹사모 리깅은 정면 미리보기를 워크벤치로 그려서 함께 죽었다. 같은 샌드박스라도 기동마다 OpenGL 이 살거나 죽는다 | `blender_link.gpu_draw_ok()`: 따로 띄운 블렌더로 16×16 워크벤치 렌더를 한 번 해 보고 실행 파일별로 기억(죽어도 본 작업과 무관). 그림을 그리는 작업에만 `STUDIO_GPU_DRAW=0` 을 넘겨 `screenshot`·`mixamo_prep` 이 **Cycles CPU**(어두운 하늘빛 + 해 조명 하나)로 대신 그림. `studio status` 에 `blender.headless_draw` 와 참고 문구. E2E 프레임 렌더도 같은 대체 경로 | run05(GPU 없음)에서 자동 감지 후 전 단계 통과. 맥에서 강제로 대체 경로를 돌려 그림 확인. 단위 시험 2건 |
+| S3 | TripoSG 를 안 깐 상태에서 `triposg generate` 가 "투명 배경 그림을 넣으라" 부터 말함 | 그림 준비가 설정 확인보다 먼저 | `require_settings()` 로 모아 그림 준비 전에 부름 | run05 에서 설정 안내가 먼저 나옴. 단위 시험 1건(수정 전 실패 확인) |
+| S4 | (시험 장치) `sweep.ps1` 2단계가 `studio` 가 아예 없어도 PASS | 빈 값끼리 비교 | 판정에 상태 결과가 있어야 한다는 조건 추가 | run01 재현 → run04~05 정상 |
+
+## 증거 그림 (`tests/e2e/evidence/`)
+| 파일 | 무엇 |
+|---|---|
+| `sbx_vgpu_vs_nogpu.jpg` | 같은 장면 스크린샷 — 왼쪽 run04 워크벤치(가상 GPU), 오른쪽 run05 Cycles CPU 대체(GPU 없음). 차는 "Cartoon Sports Car" by RCC Design (CC BY 4.0) |
+| `sbx_nogpu_car_cycles_cpu.jpg` | run05 `studio --headless screenshot` (GPU 없음 → Cycles CPU) |
+| `sbx_nogpu_markers.jpg` | run05 `mixamo rig` 정면 미리보기 + 자동 마커 8개(턱·팔꿈치·손목·무릎·사타구니) — 대체 경로에서도 몸 위에 그대로 |
+| `sbx_nogpu_cross_punch.jpg` | run05 Cross Punch 1·16·25·49 프레임 — 가드 → 뻗기 → 복귀 |
+
+## 남은 것 · 한계
+- **스마트 앱 컨트롤이 켜진 PC 에서는 이 도구를 쓸 수 없다.** 블렌더 공식판부터 막힌다. 길은 사용자가 판단해서 끄는 것뿐이고, 설치 스크립트는 이제 그 사실을 먼저 알려 준다. 마이크로소프트 스토어판 블렌더는 스토어 서명이라 통과할 수도 있지만, uv 파이썬이 또 막히므로 이번에는 시험하지 않았다.
+- 샌드박스 기능 시험(run03~05)은 **샌드박스 안에서만** 스마트 앱 컨트롤을 끄고 했다. 호스트 설정과는 무관하고, 닫으면 사라진다.
+- Cycles 대체 그림은 재질의 투명도를 그대로 따른다. 이 차 모델은 도로 받침판이 투명이라 대체 그림에서 보이지 않는다(비교 그림). 확인용 그림이라 기능에는 영향이 없다.
+- GPU 없는 PC 에서 분산 렌더의 EEVEE·워크벤치 프리셋과 TripoSG 미리보기(`scripts/triposg/render_preview.py`, 워크벤치)는 손대지 않았다. 둘 다 GPU 가 있는 PC 를 전제로 하는 기능이다. `studio status` 가 그 사실을 알려 준다.
+- 샌드박스에 claude·codex 가 없어서 MCP 등록 단계는 "안내하고 건너뛰기" 만 확인했다.
+- 믹사모 계정에 시험 캐릭터 2개(`e2e_Hero`, run04·run05)가 더 올라갔다. run03 은 업로드 전에 죽어서 0개다.
+- run01 기동이 시험을 마친 직후 가상머신이 스스로 꺼졌다(종료 코드 0xC0370103). 원인은 확인하지 못했고, 다시 띄워서 이어 갔다.
+- run04~06 은 **아직 GitHub 에 올리지 않은 수정판 묶음**으로 돌렸다. 푸시한 뒤에 GitHub zip 경로로 한 번 더 돌려 확인해야 한다(`run.txt` 의 `source=github`).
+
+## 샌드박스에서 다시 돌리는 법 (`tests/e2e/sandbox/`)
+1. 호스트에 `C:\bms_sbx\bms.wsb`(이 폴더의 `bms.wsb`)를 두고 `C:\bms_sbx\share\` 에 `sbx_run.ps1` 과 `run.txt` 를 넣는다. `run.txt` 의 줄은 `run=run07` · `source=github`(또는 `local` = `share\src\repo.tar`) · `idle_min=40` · `sac_off=1`(샌드박스 안에서만 스마트 앱 컨트롤 끄기) · `skip_main=1`(진단만).
+2. 계정을 시험하려면 토큰 파일을 `share\cred\credentials.json` 에 넣는다. 샌드박스가 복사한 뒤 바로 지운다.
+3. `powershell -ExecutionPolicy Bypass -File launch.ps1` 로 띄운다(GPU 없는 PC 재현은 `-Wsb` 로 `<VGpu>Disable</VGpu>` 판).
+4. 결과는 `share\out\<run>\progress.log`(STEP n PASS/FAIL 한 줄씩)와 로그·그림이다. 끝난 뒤에도 `idle_min` 분 동안 `share\cmd\*.ps1` 을 받아 실행한다(원인 조사용). `share\cmd\shutdown` 파일을 만들면 닫힌다.
