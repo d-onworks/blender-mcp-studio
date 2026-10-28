@@ -1,4 +1,5 @@
 import json
+import subprocess
 import socket
 import threading
 
@@ -101,3 +102,43 @@ def test_headless_blender_never_inherits_stdin(monkeypatch, tmp_path):
     blender_link.run_headless("print(1)", save=False)
     blender_link.blender_version(exe)
     assert seen and all(k.get("stdin") is subprocess.DEVNULL for k in seen)
+
+
+def test_gpu_draw_probe_runs_once_and_passes_env(monkeypatch, tmp_path):
+    """그래픽 문맥이 없는 PC(윈도우 샌드박스 실측)에서 워크벤치는 블렌더를 죽인다 — 따로 시험하고, 그리는 작업에만 0 을 넘긴다."""
+    exe = tmp_path / "blender"
+    exe.write_text("")
+    monkeypatch.setattr(blender_link, "find_blender", lambda: exe)
+    monkeypatch.delenv(blender_link.GPU_DRAW_ENV, raising=False)
+    calls = []
+
+    class Crash:                                      # 시험용 워크벤치 렌더가 죽은 블렌더(0xC0000005)
+        returncode = 3221225477
+        stdout = stderr = b""
+
+    class Ok:
+        returncode = 0
+        stdout = blender_link.MARK + "{}\n"
+        stderr = ""
+
+    def fake_run(cmd, **k):
+        calls.append((cmd, k))
+        return Crash() if "--" in cmd else Ok()
+    monkeypatch.setattr(blender_link.subprocess, "run", fake_run)
+
+    blender_link.run_headless("print(1)", save=False)          # 그리지 않는 작업 → 시험 안 함
+    assert len(calls) == 1 and calls[0][1].get("env") is None
+    code = "import os\nprint(os.environ.get('STUDIO_GPU_DRAW'))"
+    blender_link.run_headless(code, save=False)
+    blender_link.run_headless(code, save=False)                 # 두 번째는 기억한 값
+    probes = [c for c in calls if "--" in c[0]]
+    assert len(probes) == 1 and probes[0][1].get("stdin") is subprocess.DEVNULL
+    sent = [c[1]["env"][blender_link.GPU_DRAW_ENV] for c in calls if c[1].get("env")]
+    assert sent == ["0", "0"]
+
+
+def test_gpu_draw_env_override(monkeypatch):
+    monkeypatch.setenv(blender_link.GPU_DRAW_ENV, "1")
+    assert blender_link.gpu_draw_ok() is True
+    monkeypatch.setenv(blender_link.GPU_DRAW_ENV, "0")
+    assert blender_link.gpu_draw_ok() is False

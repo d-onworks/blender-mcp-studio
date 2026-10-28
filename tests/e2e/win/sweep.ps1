@@ -56,7 +56,7 @@ if (Test-Path $credSrc) {
     icacls "$env:STUDIO_HOME\credentials.json" /inheritance:r /grant:r "$($env:USERNAME):F" | Out-Null
 }
 $st = J @("studio", "--json", "status", "--no-gui")
-Step "2" ($st.accounts.sketchfab -ne "없음" -and $st.accounts.mixamo -ne "없음") ("accounts=" + ($st.accounts | ConvertTo-Json -Compress))
+Step "2" ($st -and $st.accounts.sketchfab -and $st.accounts.sketchfab -ne "없음" -and $st.accounts.mixamo -and $st.accounts.mixamo -ne "없음") ("accounts=" + ($st.accounts | ConvertTo-Json -Compress) + " headless_draw=" + $st.blender.headless_draw)
 
 # 3) 스케치팹
 $t = Get-Date; $s = studio --headless sketchfab search "sports car" 2>&1 | Out-String
@@ -75,7 +75,9 @@ $t = Get-Date; $rg = J @("studio", "--headless", "--json", "mixamo", "rig", "e2e
 Step "4b" ($rg -and $rg.armature -eq "e2e_Hero_rig" -and $rg.bones -ge 25 -and $rg.armature_scale[0] -eq 1 -and (Test-Path $rg.marker_preview)) ("리깅 " + [int]((Get-Date) - $t).TotalSeconds + "초 뼈 " + $rg.bones)
 $t = Get-Date; $an = J @("studio", "--headless", "--json", "mixamo", "animate", "e2e_Hero", "Cross Punch", "--fps", "24", "--action-name", "e2e_Cross")
 Step "4c" ($an -and $an.action -eq "e2e_Cross" -and $an.frames -gt 20 -and $an.unmapped_count -eq 0) ("동작 " + [int]((Get-Date) - $t).TotalSeconds + "초 " + $an.frames + "프레임")
+if ($st.blender.headless_draw -eq $false) { $env:STUDIO_GPU_DRAW = "0" }   # 그래픽 문맥 없음 → 프레임도 Cycles CPU 로
 & $Blender -b "$env:STUDIO_HOME\work\scene.blend" --factory-startup -P "$Here\render_frames.py" -- e2e_Hero_rig "$Work\mixamo_frames" 2>&1 | Out-Null
+Remove-Item Env:\STUDIO_GPU_DRAW -ErrorAction SilentlyContinue
 Step "4d" ((Get-ChildItem "$Work\mixamo_frames" -Filter *.png -ErrorAction SilentlyContinue).Count -ge 3) "렌더 프레임(눈으로 확인: $Work\mixamo_frames)"
 if ($rg.marker_preview) { Copy-Item $rg.marker_preview "$Work\mixamo_markers.png" -ErrorAction SilentlyContinue }
 

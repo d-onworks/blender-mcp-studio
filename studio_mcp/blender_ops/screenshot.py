@@ -1,11 +1,51 @@
 # [블렌더 안에서 실행] 장면을 PNG 한 장으로 — 클로드가 결과를 눈으로 확인하는 용도.
 # GUI: 3D 뷰 그대로 뷰포트 렌더(render.opengl). 맥에서 화면 캡처 연산자는 소켓 문맥에서 1×1 빈 그림이 나오는 일이 있어 쓰지 않는다.
 # 백그라운드: 창이 없으니 임시 카메라로 보이는 물체 전체를 3/4 각도로 잡아 워크벤치 렌더.
+#   그래픽 문맥이 없는 PC(GPU 없음·윈도우 샌드박스·원격 서버)에서는 워크벤치가 블렌더를 죽이므로 Cycles CPU 로 대신 그린다.
 import math
 import os
 
 import bpy
 from mathutils import Vector
+
+
+def _gpu_draw_ok():
+    """studio 가 미리 시험해 넘긴 값 — 0 이면 이 블렌더는 그래픽 문맥이 없어 워크벤치 렌더에서 죽는다(GPU 없음·가상 GPU)."""
+    return os.environ.get("STUDIO_GPU_DRAW", "1") != "0"
+
+
+def _cycles_cpu_look(sc, samples=16):
+    """워크벤치 대신 Cycles CPU — 어두운 회색 하늘빛 + 비스듬한 해 조명 하나로 형태가 읽히게. 되돌리는 함수를 돌려준다."""
+    cy = sc.cycles
+    keep = (sc.world, sc.render.engine, cy.device, cy.samples, cy.use_denoising)
+    w = bpy.data.worlds.new("_studio_cpu_world")
+    w.color = (0.12, 0.12, 0.12)
+    nt = getattr(w, "node_tree", None)
+    if nt is None and hasattr(w, "use_nodes"):
+        try:
+            w.use_nodes = True
+            nt = w.node_tree
+        except (AttributeError, TypeError):
+            nt = None
+    bg = next((n for n in nt.nodes if n.type == "BACKGROUND"), None) if nt else None
+    if bg:
+        bg.inputs[0].default_value = (0.12, 0.12, 0.12, 1.0)
+        bg.inputs[1].default_value = 1.0
+    sun_data = bpy.data.lights.new("_studio_cpu_sun", "SUN")
+    sun_data.energy = 3.0
+    sun = bpy.data.objects.new("_studio_cpu_sun", sun_data)
+    sun.rotation_euler = (0.85, 0.0, 0.6)
+    sc.collection.objects.link(sun)
+    sc.world = w
+    sc.render.engine = "CYCLES"
+    cy.device, cy.samples, cy.use_denoising = "CPU", samples, True
+
+    def restore():
+        sc.world, sc.render.engine, cy.device, cy.samples, cy.use_denoising = keep
+        bpy.data.objects.remove(sun, do_unlink=True)
+        bpy.data.lights.remove(sun_data)
+        bpy.data.worlds.remove(w)
+    return restore
 
 
 def _view3d():
@@ -60,11 +100,19 @@ def screenshot(path, width=960, height=540):
         else:
             temp_cam = _frame_camera(sc)
             sc.camera = temp_cam
-            r.engine = "BLENDER_WORKBENCH"
-            sc.display.shading.light = "STUDIO"
-            sc.display.shading.color_type = "TEXTURE"
-            bpy.ops.render.render(write_still=True)
-            how = "자동 카메라(3/4 각도) 워크벤치 렌더"
+            if _gpu_draw_ok():
+                r.engine = "BLENDER_WORKBENCH"
+                sc.display.shading.light = "STUDIO"
+                sc.display.shading.color_type = "TEXTURE"
+                bpy.ops.render.render(write_still=True)
+                how = "자동 카메라(3/4 각도) 워크벤치 렌더"
+            else:
+                restore = _cycles_cpu_look(sc)
+                try:
+                    bpy.ops.render.render(write_still=True)
+                finally:
+                    restore()
+                how = "자동 카메라(3/4 각도) Cycles CPU 렌더(이 PC 는 그래픽 문맥이 없어 워크벤치 대신)"
     finally:
         (r.filepath, r.resolution_x, r.resolution_y, r.resolution_percentage,
          r.image_settings.file_format, r.engine, sc.camera) = keep

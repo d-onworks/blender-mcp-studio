@@ -286,6 +286,45 @@ def _surface_points(obj):
     return [tuple(v.co) for v in obj.data.vertices] + [tuple(f.center) for f in obj.data.polygons]
 
 
+def _gpu_draw_ok():
+    """studio 가 미리 시험해 넘긴 값 — 0 이면 이 블렌더는 그래픽 문맥이 없어 워크벤치 렌더에서 죽는다(GPU 없음·가상 GPU)."""
+    return os.environ.get("STUDIO_GPU_DRAW", "1") != "0"
+
+
+def _cycles_cpu_look(sc, samples=16):
+    """워크벤치 대신 Cycles CPU — 어두운 회색 하늘빛 + 비스듬한 해 조명 하나로 형태가 읽히게. 되돌리는 함수를 돌려준다."""
+    cy = sc.cycles
+    keep = (sc.world, sc.render.engine, cy.device, cy.samples, cy.use_denoising)
+    w = bpy.data.worlds.new("_studio_cpu_world")
+    w.color = (0.12, 0.12, 0.12)
+    nt = getattr(w, "node_tree", None)
+    if nt is None and hasattr(w, "use_nodes"):
+        try:
+            w.use_nodes = True
+            nt = w.node_tree
+        except (AttributeError, TypeError):
+            nt = None
+    bg = next((n for n in nt.nodes if n.type == "BACKGROUND"), None) if nt else None
+    if bg:
+        bg.inputs[0].default_value = (0.12, 0.12, 0.12, 1.0)
+        bg.inputs[1].default_value = 1.0
+    sun_data = bpy.data.lights.new("_studio_cpu_sun", "SUN")
+    sun_data.energy = 3.0
+    sun = bpy.data.objects.new("_studio_cpu_sun", sun_data)
+    sun.rotation_euler = (0.85, 0.0, 0.6)
+    sc.collection.objects.link(sun)
+    sc.world = w
+    sc.render.engine = "CYCLES"
+    cy.device, cy.samples, cy.use_denoising = "CPU", samples, True
+
+    def restore():
+        sc.world, sc.render.engine, cy.device, cy.samples, cy.use_denoising = keep
+        bpy.data.objects.remove(sun, do_unlink=True)
+        bpy.data.lights.remove(sun_data)
+        bpy.data.worlds.remove(w)
+    return restore
+
+
 def _render_front(obj, path, res=768):
     """임시 장면에서 정면(-Y 쪽에서 +Y 를 보는) 직교 워크벤치 렌더. 열린 장면은 건드리지 않는다."""
     pts = [obj.matrix_world @ Vector(c) for c in obj.bound_box]
@@ -305,14 +344,21 @@ def _render_front(obj, path, res=768):
         cam.rotation_euler = (math.radians(90), 0, 0)
         cam_data.clip_end = (hi.y - lo.y) + 20
         sc.camera = cam
-        sc.render.engine = "BLENDER_WORKBENCH"
         sc.render.resolution_x = sc.render.resolution_y = res
         sc.render.resolution_percentage = 100
         sc.render.image_settings.file_format = "PNG"
         sc.render.filepath = path
-        sc.display.shading.light = "STUDIO"
-        sc.display.shading.color_type = "MATERIAL"
-        bpy.ops.render.render(write_still=True, scene=sc.name)
+        if _gpu_draw_ok():
+            sc.render.engine = "BLENDER_WORKBENCH"
+            sc.display.shading.light = "STUDIO"
+            sc.display.shading.color_type = "MATERIAL"
+            bpy.ops.render.render(write_still=True, scene=sc.name)
+        else:                                        # 그래픽 문맥 없음 → Cycles CPU(마커는 기하로 정하니 그림만 바뀐다)
+            restore = _cycles_cpu_look(sc)
+            try:
+                bpy.ops.render.render(write_still=True, scene=sc.name)
+            finally:
+                restore()
         return {"center": (c.x, c.z), "ortho_scale": scale, "res": res}
     finally:
         for o in list(sc.collection.objects):

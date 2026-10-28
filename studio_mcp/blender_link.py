@@ -125,6 +125,61 @@ def gui_alive(timeout: float = 2.0) -> bool:
 
 
 # ── ② 백그라운드 ─────────────────────────────────────────
+GPU_DRAW_ENV = "STUDIO_GPU_DRAW"
+_GPU_PROBE = """
+import bpy, sys
+sc = bpy.context.scene
+sc.render.engine = "BLENDER_WORKBENCH"
+sc.render.resolution_x = sc.render.resolution_y = 16
+sc.render.resolution_percentage = 100
+sc.render.filepath = sys.argv[-1]
+bpy.ops.render.render(write_still=True)
+"""
+
+
+def gpu_draw_ok(exe: Path | None = None) -> bool | None:
+    """백그라운드 블렌더가 그래픽(OpenGL) 문맥을 만들 수 있는지 = 워크벤치·EEVEE 렌더가 되는지.
+
+    GPU 가 없거나 가상 GPU 뿐이면(윈도우 샌드박스·원격 서버·가상머신) 블렌더 5.2 는 오류를 내지 않고
+    GPU_fence_signal 에서 죽는다(2026-10-28 윈도우 샌드박스 실측: 워크벤치 렌더 = 0xC0000005, Cycles CPU = 정상).
+    그래서 따로 띄운 블렌더로 16×16 워크벤치 렌더를 한 번 해 보고, 결과를 블렌더 실행 파일별로 기억한다.
+    환경변수 STUDIO_GPU_DRAW=0/1 이 있으면 시험 없이 그 값을 쓴다. 블렌더가 없으면 None.
+    """
+    forced = os.environ.get(GPU_DRAW_ENV)
+    if forced in ("0", "1"):
+        return forced == "1"
+    exe = Path(exe) if exe else find_blender()
+    if not exe or not exe.is_file():
+        return None
+    st = exe.stat()
+    key = f"{exe}|{st.st_size}|{int(st.st_mtime)}"
+    cache = config.sub("cache") / "gpu_draw.json"
+    try:
+        d = json.loads(cache.read_text(encoding="utf-8"))
+        if d.get("key") == key:
+            return bool(d["ok"])
+    except (OSError, ValueError, KeyError):
+        pass
+    tmp = Path(tempfile.mkdtemp(prefix="studio_gpu_"))
+    script, png = tmp / "probe.py", tmp / "probe.png"
+    script.write_text(_GPU_PROBE, encoding="utf-8")
+    try:
+        r = subprocess.run([str(exe), "-b", "--factory-startup", "--python", str(script), "--python-exit-code", "1",
+                            "--", str(png)], stdin=subprocess.DEVNULL, capture_output=True, timeout=120)
+        ok = r.returncode == 0 and png.is_file()
+    except subprocess.TimeoutExpired:
+        return None                                   # 느린 것뿐일 수 있다 — 기억하지 않고 다음에 다시 본다
+    except OSError:
+        ok = False
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    try:
+        cache.write_text(json.dumps({"key": key, "ok": ok}), encoding="utf-8")
+    except OSError:
+        pass
+    return ok
+
+
 HEADLESS_WRAP = """
 import bpy, os, sys
 _scene = {scene!r}
@@ -148,11 +203,16 @@ def run_headless(code: str, scene: Path | None = None, save: bool = True, timeou
     fd, script = tempfile.mkstemp(prefix="studio_", suffix=".py")
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         f.write(HEADLESS_WRAP.format(scene=str(scene), code=code, save=save))
+    env = None
+    if GPU_DRAW_ENV in code:
+        # 그림을 그리는 작업(스크린샷·믹사모 미리보기)만 — 그래픽 문맥이 없으면 블렌더 안에서 Cycles CPU 로 대신 그린다
+        env = dict(os.environ, **{GPU_DRAW_ENV: "0" if gpu_draw_ok(exe) is False else "1"})
     try:
         # stdin=DEVNULL: MCP 서버(stdio)는 다른 스레드에서 stdin 파이프를 읽고 있다. 윈도우에서 그 파이프를 물려받은
         # 블렌더는 시작하다 멈춘다(2026-10-28 E2E 실측: 물려받으면 300초 멈춤, DEVNULL 이면 0.6초).
         proc = subprocess.run([str(exe), "-b", "--factory-startup", "--python", script, "--python-exit-code", "1"],
-                              stdin=subprocess.DEVNULL, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout)
+                              stdin=subprocess.DEVNULL, capture_output=True, text=True, encoding="utf-8", errors="replace",
+                              timeout=timeout, env=env)
     except subprocess.TimeoutExpired:
         raise BlenderError(f"백그라운드 블렌더가 {timeout:.0f}초 안에 끝나지 않았습니다.") from None
     finally:

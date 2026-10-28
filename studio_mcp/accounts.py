@@ -268,7 +268,9 @@ def status(probe_gui: bool = True) -> dict:
     exe = blender_link.find_blender()
     gui = blender_link.gui_alive(timeout=2.0) if probe_gui else None
     st = {
-        "blender": {"path": str(exe) if exe else None, "version": blender_link.blender_version(exe) if exe else None},
+        "blender": {"path": str(exe) if exe else None, "version": blender_link.blender_version(exe) if exe else None,
+                    # 백그라운드 블렌더가 워크벤치·EEVEE 로 그릴 수 있는지(처음 한 번 시험하고 기억). False 면 Cycles CPU 로 대신 그린다
+                    "headless_draw": blender_link.gpu_draw_ok(exe) if exe else None},
         "blender_gui_socket": {"address": "%s:%d" % blender_link.gui_address(), "alive": gui},
         "blender_mcp_addon": addon_installed(),
         "uv": shutil.which("uv"),
@@ -287,6 +289,9 @@ def status(probe_gui: bool = True) -> dict:
     for s, v in st["accounts"].items():
         if v == "없음":
             todo.append(f"{SERVICES[s]['name']} 연동: account_login('{s}')")
+    if st["blender"]["headless_draw"] is False:
+        todo.append("참고: 이 PC 의 백그라운드 블렌더는 그래픽 문맥이 없어(GPU 없음·가상머신) 스크린샷·믹사모 미리보기를 "
+                    "Cycles CPU 로 대신 그립니다(조금 느림). 분산 렌더의 EEVEE·워크벤치 프리셋은 이 PC 에서 쓸 수 없습니다.")
     if not st["browser_for_login"]:
         todo.append("로그인 창용 브라우저: studio install-browser")
     st["todo"] = todo
