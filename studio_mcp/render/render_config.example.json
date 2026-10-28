@@ -1,0 +1,54 @@
+{
+  "_comment": "~/.blender-mcp-studio/render_config.json 으로 복사한 뒤 host·root·경로를 고친다. sec_per_frame 은 우리 장면의 실측값(출처는 docs/06_분산렌더.md·media/charts/DATA.md) — 장면마다 다르니 첫 분산 렌더 뒤에는 state_dir/speed.json 이 저절로 덮어쓴다.",
+  "blender": {
+    "local": "",
+    "version": "5.2.3",
+    "_local": "비워 두면 맥 /Applications/Blender.app, 윈도우 Program Files, PATH 순으로 찾는다"
+  },
+  "workers": [
+    {
+      "name": "mac",
+      "type": "local",
+      "_gpu": "Apple M4 Max 32-core GPU (Metal, MetalRT)",
+      "extra": "",
+      "sec_per_frame": {
+        "final": 24.45,
+        "preview": 2.59,
+        "preview-eevee": 0.39,
+        "preview-workbench": 0.05,
+        "keep": 4.08
+      }
+    },
+    {
+      "name": "win",
+      "type": "ssh-windows",
+      "_gpu": "NVIDIA GeForce RTX 3080 10GB (OptiX)",
+      "host": "render-pc",
+      "root": "C:\\render\\blender",
+      "blender_exe": "C:\\render\\blender\\blender-5.2.3\\blender.exe",
+      "task_hours": 12,
+      "extra": "",
+      "sec_per_frame": {
+        "final": 15.96,
+        "preview": 1.90,
+        "preview-eevee": 0.42,
+        "preview-workbench": 0.04,
+        "keep": 4.81
+      }
+    }
+  ],
+  "split": {
+    "snap_to_camera_cuts": true,
+    "snap_tolerance": 0.25,
+    "startup_sec": 30,
+    "steal_chunk_sec": 120,
+    "local_wait_min": 10
+  },
+  "state_dir": "~/.blender-mcp-studio/render",
+  "ffmpeg": {
+    "fps": 24,
+    "crf": 16,
+    "codec": "libx264",
+    "pix_fmt": "yuv420p"
+  }
+}

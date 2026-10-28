@@ -1,0 +1,31 @@
+[project]
+name = "blender-mcp-studio"
+version = "0.1.0"
+description = "클로드 코드·코덱스에서 블렌더 + 스케치팹 + 믹사모를 자연어로 다루는 MCP 서버와 studio 명령"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "D-ON WORKS" }]
+requires-python = ">=3.10"
+dependencies = [
+    # mcp 2.x 는 FastMCP 를 MCPServer 로 바꿨다. 설계(DESIGN.md)는 FastMCP 기준이라 1.x 로 고정한다.
+    "mcp>=1.20,<2",
+    "requests>=2.31",
+    "pillow>=10.0",
+    "playwright>=1.45",
+]
+
+[project.scripts]
+studio = "studio_mcp.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
+
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["studio_mcp"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests/unit"]

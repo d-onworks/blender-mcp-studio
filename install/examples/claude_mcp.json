@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "studio": {
+      "command": "studio",
+      "args": ["serve"]
+    },
+    "blender": {
+      "command": "uvx",
+      "args": ["mcp-for-blender"],
+      "env": {
+        "BLENDER_HOST": "localhost",
+        "BLENDER_PORT": "9876",
+        "DISABLE_TELEMETRY": "true"
+      }
+    }
+  }
+}

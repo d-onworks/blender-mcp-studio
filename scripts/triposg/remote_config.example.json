@@ -1,0 +1,10 @@
+{
+  "host": "my-gpu-pc",
+  "shell": "powershell",
+  "remote_dir": "C:/triposg/out/demo",
+  "remote_python": "C:/triposg/python/python.exe",
+  "triposg_src": "C:/triposg/src/TripoSG",
+  "weights": "C:/triposg/models/TripoSG",
+  "path_prepend": "",
+  "env": ["HF_HOME=C:/triposg/models/hf"]
+}

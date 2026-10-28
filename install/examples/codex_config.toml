@@ -1,0 +1,21 @@
+# ~/.codex/config.toml 에 붙여 넣는다(코덱스 CLI·데스크톱 앱·IDE 확장이 같은 파일을 쓴다).
+# 명령으로:  codex mcp add studio -- studio serve
+#            codex mcp add blender --env DISABLE_TELEMETRY=true -- uvx mcp-for-blender
+# 앱이 studio·uvx 를 못 찾으면 command 를 전체 경로로(맥: `which studio`, 윈도우: `where studio`).
+
+[mcp_servers.studio]
+command = "studio"
+args = ["serve"]
+startup_timeout_sec = 60
+tool_timeout_sec = 600          # 스케치팹 받기·블렌더 가져오기·믹사모 리깅은 수십 초~몇 분 걸린다
+
+[mcp_servers.blender]
+command = "uvx"
+args = ["mcp-for-blender"]
+startup_timeout_sec = 60
+tool_timeout_sec = 120
+
+[mcp_servers.blender.env]
+BLENDER_HOST = "localhost"
+BLENDER_PORT = "9876"
+DISABLE_TELEMETRY = "true"
