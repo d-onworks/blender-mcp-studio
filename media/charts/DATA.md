@@ -19,7 +19,7 @@
 | 파일 | 내용 | 원래 위치(사내 작업 저장소) |
 |---|---|---|
 | `runs.json` | 분산 렌더 3건, 기계별 프레임마다 렌더 시간(`[프레임, 초]`), 합계·평균 | 각 작업 결과 폴더의 `_render_<기계>_<구간>.json` (`blender/bl_render_range.py` 가 남김) |
-| `win_mem_cinematic_final.csv` | 1080p 최종 본편 렌더 중 윈도우 2초 간격 기록 5,701줄 | 윈도우 작업 폴더 `work/sjw_final/mem.csv` |
+| `win_mem_cinematic_final.csv` | 1080p 최종 본편 렌더 중 윈도우 2초 간격 기록 5,701줄 | 윈도우 작업 폴더 `work/<작업이름>/mem.csv` |
 | `win_mem_fight_preview.csv` | 격투 미리보기 렌더 중 같은 기록 1,051줄 | 윈도우 작업 폴더 `work/<작업이름>/mem.csv` |
 
 CSV 열: `time`(윈도우 시계 HH:MM:SS), `vram_mb`(nvidia-smi memory.used, MiB), `gpu_util_pct`, `blender_ram_mb`(블렌더 프로세스 작업 집합).
