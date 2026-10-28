@@ -10,6 +10,7 @@
 이미 된 단계는 건너뛴다(여러 번 돌려도 안전). 공식 출처만: winget(블렌더 재단·astral) · download.blender.org(sha256 확인) ·
 astral.sh(uv 공식 설치 스크립트) · PyPI.
 winget 이 없어도 된다: 블렌더는 공식 zip(포터블)을 받아 해시를 확인한 뒤 풀고, uv 는 공식 설치 스크립트로 깐다.
+스마트 앱 컨트롤이 '켜짐'이면 블렌더·파이썬이 실행 차단되므로 받기 전에 알리고 멈춘다(-IgnoreSmartAppControl 로 건너뛰기).
 #>
 param(
     [switch]$DryRun,
@@ -20,7 +21,8 @@ param(
     [switch]$SkipBrowser,
     [string]$BlenderVersion = "5.2.3",
     [string]$BlenderPath = "",
-    [string]$BlenderDir = ""
+    [string]$BlenderDir = "",
+    [switch]$IgnoreSmartAppControl
 )
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"          # PowerShell 5.1 은 진행 막대 때문에 내려받기가 수십 배 느려진다
@@ -44,9 +46,21 @@ function Run([string]$exe, [string[]]$argv) {
     Write-Host ("  > " + $exe + " " + ($argv -join " "))
     if (-not $DryRun) {
         $r = Quiet { & $exe @argv }
-        if ($r.Code -ne 0) { Write-Host $r.Out; throw "$exe 실패(종료 코드 $($r.Code))" }
+        if ($r.Code -ne 0) {
+            Write-Host $r.Out
+            if ($r.Out -match '4551|애플리케이션 제어 정책|Application Control policy') { Warn (Sac-Hint) }
+            throw "$exe 실패(종료 코드 $($r.Code))"
+        }
         return $r.Out
     }
+}
+# 스마트 앱 컨트롤(새 윈도우 11 의 보안 기능) — 0 꺼짐 · 1 켜짐 · 2 평가(막지 않고 지켜보기) · $null 없음
+function Sac-State {
+    try { return (Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Control\CI\Policy" -ErrorAction Stop).VerifiedAndReputablePolicyState } catch { return $null }
+}
+function Sac-Hint {
+    return ("윈도우 '스마트 앱 컨트롤'이 서명 없는 프로그램 조각을 막은 것으로 보입니다(오류 0xC0E90002 · os error 4551). " +
+            "docs/01_블렌더설치.md 의 '자주 막히는 곳'을 보세요.")
 }
 function Refresh-Path {
     $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User") + ";$UserBin"
@@ -95,6 +109,10 @@ function Install-BlenderZip {
     $exe = Join-Path $dest "blender.exe"
     Write-Host "  > 받기: $base/$zipName  →  $BlenderDir"
     if ($DryRun) { return $exe }
+    if (Test-Path $exe) {
+        # 이미 풀어 둔 블렌더를 찾기 단계가 못 알아봤다 = 실행이 안 된다. 같은 걸 또 받아 봐야 소용없다.
+        throw "블렌더가 이미 $exe 에 있는데 실행되지 않습니다(--version 실패). 보안 프로그램이 막고 있을 수 있습니다. " + (Sac-Hint)
+    }
     New-Item -ItemType Directory -Force -Path $BlenderDir | Out-Null
     $tmp = Join-Path $env:TEMP ("bms_" + [guid]::NewGuid().ToString("N").Substring(0, 8))
     New-Item -ItemType Directory -Force -Path $tmp | Out-Null
@@ -122,6 +140,7 @@ function Install-BlenderZip {
         Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
     }
     if (-not (Test-Path $exe)) { throw "압축을 풀었는데 $exe 가 없습니다." }
+    if (-not (Blender-Version $exe)) { throw "받은 블렌더가 실행되지 않습니다($exe --version 실패). " + (Sac-Hint) }
     Ok "설치: $exe"
     return $exe
 }
@@ -132,6 +151,22 @@ Say "1. 준비물 확인"
 $winget = Has winget
 if ($winget) { Ok "winget 있음" } else { Warn "winget 이 없습니다 — 블렌더는 공식 zip, uv 는 공식 설치 스크립트로 대신 깝니다." }
 Ok ("저장소: " + $Repo)
+$sac = Sac-State
+if ($sac -eq 1 -and -not $IgnoreSmartAppControl) {
+    # 실측(윈도우 샌드박스, 2026-10-28): 블렌더 5.2.3 공식 zip 의 DLL 61개가 모두 서명이 없어 blender.exe 가 0xC0E90002 로 안 뜨고,
+    # uv 가 받는 파이썬(python-build-standalone)도 os error 4551 로 막혔다. 400MB 를 받기 전에 알리고 멈춘다.
+    Write-Host "  [멈춤] 윈도우 '스마트 앱 컨트롤'이 켜져 있습니다(윈도우 보안 > 앱 및 브라우저 컨트롤)." -ForegroundColor Yellow
+    Write-Host "    이 기능은 서명이 없는 프로그램 조각을 막습니다. 블렌더 공식판에 든 DLL 과 uv 가 받는 파이썬이 여기에 걸려"
+    Write-Host "    설치해도 실행되지 않습니다(오류 0xC0E90002 · os error 4551 '애플리케이션 제어 정책에서 이 파일을 차단')."
+    Write-Host "    선택지: (1) 그대로 두고 이 도구를 쓰지 않는다  (2) 윈도우 보안에서 스마트 앱 컨트롤을 끈다."
+    Write-Host "    끄는 것은 보안 수준을 낮추는 일이고, 윈도우 버전에 따라 다시 켜려면 윈도우를 새로 설치해야 할 수 있습니다. 직접 판단하세요."
+    Write-Host "    끈 뒤 이 스크립트를 다시 돌리면 이어서 설치합니다. 회사 정책으로 허용 목록이 따로 있으면 -IgnoreSmartAppControl 로 건너뜁니다."
+    Write-Host "    자세한 내용: docs/01_블렌더설치.md '자주 막히는 곳'"
+    if (-not $DryRun) { exit 3 }
+    Warn "(드라이런이라 나머지 단계도 보여 줍니다)"
+} elseif ($sac -eq 2) {
+    Ok "스마트 앱 컨트롤 = 평가 모드(지금은 막지 않음). '켜짐'으로 바뀌면 블렌더·파이썬이 막힐 수 있습니다(docs/01 '자주 막히는 곳')."
+}
 
 Say "2. 블렌더 $BlenderVersion"
 $blender = Find-Blender
