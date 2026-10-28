@@ -3,7 +3,7 @@
 # Blender MCP Studio
 
 **유튜브에서 본 그 과정, 이 저장소를 받으면 말로 똑같이 할 수 있습니다.**
-클로드 코드나 코덱스에 설치 프롬프트 한 장을 붙여 넣으면 블렌더·MCP·스케치팹·믹사모 연결이 끝납니다.
+클로드 코드나 코덱스에 "설치해줘" 한 마디면 블렌더·MCP·스케치팹·믹사모 연결이 끝납니다.
 그다음부터는 영상에서처럼 "자동차 찾아줘", "펀치 넣어줘", "나눠서 렌더해"라고 말하면 됩니다.
 
 <img src="media/hero.jpg" width="100%" alt="이 파이프라인으로 만든 장면들 — 격투, 스포츠카, 카피바라 털, 리깅, 점토 모형, 2인 샷">
@@ -22,7 +22,7 @@
 
 | 영상 장면 | 클로드 코드·코덱스에 하는 말 (예) | 이 저장소에서 쓰이는 것 |
 |---|---|---|
-| 블렌더와 클로드 코드, MCP 연결 4분 | `INSTALL_PROMPT.md` 0번 상자 붙여 넣기 | 설치 스크립트 → 블렌더 5.2.3·블렌더 MCP·`studio` 설치, 클로드·코덱스 등록 |
+| 블렌더와 클로드 코드, MCP 연결 4분 | "설치해줘" | 설치 스크립트 → 블렌더 5.2.3·블렌더 MCP·`studio` 설치, 클로드·코덱스 등록 |
 | 그림을 주니까 달라졌다 — 캐릭터 시트 | "이 캐릭터 시트대로 블렌더에서 만들어 줘" | 블렌더 MCP(클로드가 블렌더 코드를 직접 짜서 실행) |
 | 자러 가기 전에 캡처 던져 두기 · 47번 더 고치기 | "화면 캡처해서 시트랑 다른 곳 찾아 고쳐 줘" | `blender_screenshot` → 클로드가 그림을 보고 다시 고침 |
 | 뼈대 심고 움직이기 | "이 캐릭터에 믹사모로 뼈 넣고 걷기 동작 붙여 줘" | `mixamo_rig` · `mixamo_animate` (자동 리깅 + 동작 붙이기) |
@@ -31,6 +31,14 @@
 | 최종 렌더 | "맥이랑 윈도우로 나눠서 렌더해 줘" | `render_plan` · `render_distributed` (기기 속도대로 나눠 그리고 이어 붙임) |
 
 > 솔직하게: 스케치팹·믹사모·렌더는 말 한마디로 끝납니다. 캐릭터 모델링은 클로드가 매번 코드를 새로 짜기 때문에 결과가 영상과 똑같지 않습니다. 영상 속 캐릭터도 캡처를 보고 "여기 고쳐"를 수십 번 되풀이해서 나왔습니다. 그 반복을 말로 할 수 있게 해 주는 게 이 저장소입니다.
+
+### 먼저 알아 두세요 — 제한 사항
+
+- **그림 한 장 주고 "이대로 모델링해 줘"는 한 번에 되지 않습니다.** 클로드가 블렌더 코드를 짜서 모양을 만들고, 캡처를 보고 고치기를 여러 번 되풀이해야 합니다.
+- **현재 사람 모델링은 어렵습니다.** 개구리·카피바라처럼 둥근 덩어리 캐릭터는 코드로 잘 만들어지지만, 사람 얼굴과 애니풍 머리카락은 7번 시도해 모두 실패했습니다. 사람 캐릭터는 이미지→3D 서비스로 바탕을 뽑은 뒤 고치는 쪽을 권합니다.
+- **그래픽카드(GPU)가 있어야 제대로 씁니다.** 맥은 M 시리즈 칩(애플 실리콘)의 GPU, 윈도우는 NVIDIA 그래픽카드가 있어야 합니다. GPU가 없어도 설치·검색·리깅은 되지만, 화면 캡처와 렌더가 CPU로 대신 돌아가 아주 느립니다.
+- 분산 렌더는 맥과 윈도우 PC 두 대가 같은 네트워크에 있고 SSH로 접속할 수 있어야 합니다.
+- 그림→3D(TripoSG)는 선택 기능입니다. NVIDIA 그래픽카드 메모리(VRAM) 8GB 이상이 필요하고, 개인 프로젝트에서만 쓰세요([6절](#6-그림-한-장--3d-triposg--선택-기능-개인-프로젝트-전용)).
 
 ### 그렇게 만든 장면들
 
@@ -63,7 +71,7 @@ flowchart LR
     A -->|MCP| B["blender MCP<br/>(mcp-for-blender)"]
     S --> SK["Sketchfab<br/>검색·추천·가져오기"]
     S --> MX["Mixamo<br/>자동 리깅·동작"]
-    S --> TS["TripoSG<br/>그림 → 3D"]
+    S -.->|선택| TS["TripoSG (선택)<br/>그림 → 3D"]
     S --> R["분산 렌더<br/>Mac Metal + Win OptiX"]
     SK --> BL(("Blender 5.2"))
     MX --> BL
@@ -74,17 +82,17 @@ flowchart LR
 
 | 하는 일 | 사람이 하는 말 (예) | 실제로 일어나는 일 |
 |---|---|---|
-| 설치·연결 | `INSTALL_PROMPT.md` 0번 붙여 넣기 | 블렌더 5.2.3, uv, 블렌더 MCP 애드온, `studio` 설치 → 클로드·코덱스에 MCP 등록 |
+| 설치·연결 | "설치해줘" | 블렌더 5.2.3, uv, 블렌더 MCP 애드온, `studio` 설치 → 클로드·코덱스에 MCP 등록 |
 | 계정 연동 | "스케치팹 연결해 줘" | 가입 페이지 열기 / 로그인 창 → 토큰 자동 저장(값은 화면에 절대 안 나옴) |
 | 에셋 찾기 | "빨간 스포츠카 찾아줘" | 받을 수 있는 모델만, 라이선스·면 수·인기로 점수 → **썸네일 시트**로 추천 |
 | 가져오기 | "3번 4.5m로 가져와" | 다운로드 → 블렌더로 가져와 바닥·크기 맞춤 → `credits.json`에 출처 기록 |
 | 리깅·동작 | "이 캐릭터에 펀치 동작 넣어줘" | 믹사모 자동 리깅 → 동작 검색·내보내기 → 블렌더 캐릭터에 붙이기 |
-| 그림 → 3D | "이 캐릭터 그림을 3D로" | 로컬 GPU에서 이미지→3D → 닫힌 메시 검사 → 블렌더로 |
+| 그림 → 3D (선택) | "이 캐릭터 그림을 3D로" | NVIDIA GPU에서 이미지→3D → 닫힌 메시 검사 → 블렌더로 (설치할 때 쓸지 물어봄, 개인 프로젝트 전용) |
 | 렌더 | "맥이랑 윈도우로 나눠서 렌더해" | 기계별 실측 속도로 프레임 배분 → 동시에 렌더 → 이어 붙이기 |
 
 ---
 
-## 3. 빠른 시작 — 프롬프트 한 장
+## 3. 빠른 시작 — "설치해줘" 한 마디
 
 ```bash
 git clone https://github.com/d-onworks/blender-mcp-studio.git
@@ -92,7 +100,15 @@ cd blender-mcp-studio
 claude      # 또는 codex
 ```
 
-그리고 [`INSTALL_PROMPT.md`](INSTALL_PROMPT.md)의 **0번 상자**를 통째로 붙여 넣으면 됩니다. 에이전트가 운영체제를 확인하고, 할 일을 먼저 보여 준 뒤 설치하고, `studio status`로 스스로 확인합니다.
+그리고 **"설치해줘"** 라고 말하면 됩니다. 저장소 안의 `CLAUDE.md`·`AGENTS.md`가 에이전트에게 설치 순서를 알려 줍니다. 에이전트가 운영체제를 확인하고, 할 일을 먼저 보여 준 뒤 설치하고, `studio status`로 스스로 확인합니다. 마지막에 선택 기능(그림→3D)을 쓸지 고르는 질문이 뜹니다.
+
+저장소를 받기 전이라면 아무 폴더에서 클로드 코드를 켜고 이렇게 말해도 됩니다.
+
+```text
+https://github.com/d-onworks/blender-mcp-studio 받아서 설치해줘
+```
+
+같은 내용을 직접 붙여 넣고 싶다면 [`INSTALL_PROMPT.md`](INSTALL_PROMPT.md)의 **0번 상자**를 쓰세요.
 
 손으로 하고 싶다면:
 
@@ -118,7 +134,7 @@ studio status
 | 4 | [스케치팹](docs/04_스케치팹.md) | 가입·로그인 연동, 추천 검색, 가져오기, CC-BY 출처 표기 |
 | 5 | [믹사모](docs/05_믹사모.md) | 무료 가입, 자동 리깅, 동작 붙이기 |
 | 6 | [분산 렌더](docs/06_분산렌더.md) | 맥 + 윈도우 GPU 나눠 렌더, 실측 그래프 |
-| 7 | [TripoSG 그림→3D](docs/07_TripoSG.md) | 로컬 RTX 이미지→3D, 라이선스 주의 |
+| 7 | [TripoSG 그림→3D (선택)](docs/07_TripoSG.md) | NVIDIA VRAM 8GB 이상, 개인 프로젝트 전용, 라이선스 주의 |
 
 ### 스케치팹 — "자동차 찾아줘"
 
@@ -164,7 +180,14 @@ studio sketchfab import 3 --size 4.5
 
 ---
 
-## 6. 그림 한 장 → 3D (TripoSG)
+## 6. 그림 한 장 → 3D (TripoSG) — 선택 기능, 개인 프로젝트 전용
+
+기본 설치에는 들어가지 않습니다. "설치해줘"로 설치할 때 에이전트가 **쓸지 말지 고르는 질문**을 띄웁니다. 고르지 않으면 설치하지 않습니다.
+
+| 필요한 것 | 내용 |
+|---|---|
+| 그래픽카드 | CUDA가 되는 NVIDIA, VRAM 8GB 이상 (맥은 CUDA가 없어 GPU 윈도우·리눅스 PC에 원격으로 맡김) |
+| 쓰는 범위 | 개인 프로젝트만. 회사·상업용이면 쓰지 마세요 |
 
 캐릭터 그림 한 장을 로컬 GPU에서 3D 바탕 모델로 뽑고, 닫힌 메시인지 검사해 블렌더로 가져옵니다. 10GB 카드(RTX 3080)에서는 depth 9가 한계입니다(depth 10은 VRAM이 넘쳐 멈춘 것처럼 보임).
 
@@ -194,8 +217,9 @@ studio sketchfab import 3 --size 4.5
 
 ## English summary
 
-**Blender MCP Studio** packages the setup behind our YouTube making-of series ([@autofrogkr](https://www.youtube.com/@autofrogkr)), where every 3D scene was made by talking to Claude Code — no hands on Blender. Clone it, paste one install prompt into Claude Code or Codex, and you can repeat the same steps by voice: find a car on Sketchfab, auto-rig a character on Mixamo and add a punch, render across a Mac and a Windows PC.
+**Blender MCP Studio** packages the setup behind our YouTube making-of series ([@autofrogkr](https://www.youtube.com/@autofrogkr)), where every 3D scene was made by talking to Claude Code — no hands on Blender. Clone it, open Claude Code or Codex in the folder and say "install" (or paste the one install prompt), and you can repeat the same steps by voice: find a car on Sketchfab, auto-rig a character on Mixamo and add a punch, render across a Mac and a Windows PC.
 
 - One-shot natural-language install prompt (`INSTALL_PROMPT.md`) for macOS and Windows: Blender 5.2.3 LTS, uv, the `mcp-for-blender` add-on, and this repo's `studio` MCP server.
-- `studio` MCP tools: Sketchfab search with a ranked thumbnail contact sheet and one-step import (credits recorded), Mixamo auto-rig and animation import, local image-to-3D (TripoSG), and Mac (Metal) + Windows (OptiX) distributed Cycles rendering — measured 1.59× faster than the fastest single machine on a 1,164-frame 1080p shot.
+- `studio` MCP tools: Sketchfab search with a ranked thumbnail contact sheet and one-step import (credits recorded), Mixamo auto-rig and animation import, optional local image-to-3D (TripoSG — NVIDIA GPU with 8 GB+ VRAM, personal projects only; the installer asks first), and Mac (Metal) + Windows (OptiX) distributed Cycles rendering — measured 1.59× faster than the fastest single machine on a 1,164-frame 1080p shot.
+- Limits: one image plus "model this" is not one-shot — Claude writes Blender code and fixes it over many screenshot rounds. Human characters are currently hard (anime hair failed 7 times). A GPU is needed for practical use (Apple Silicon Mac or Windows with NVIDIA); without one, screenshots and renders fall back to the CPU and are very slow.
 - No models or animation files are included; users fetch them with their own accounts. TripoSG's core code is under a license that excludes South Korea, the EU and the UK — see `docs/07_TripoSG.md`.

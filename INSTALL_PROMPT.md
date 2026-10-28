@@ -14,6 +14,7 @@
 2) 맥이면 `bash install/install_mac.sh --dry-run`, 윈도우면 `powershell -ExecutionPolicy Bypass -File install\install_win.ps1 -DryRun` 으로 할 일을 먼저 보여 주고, 이어서 --dry-run 없이 실행해.
 3) 끝나면 `studio status` 를 실행해서 결과를 표로 정리해 줘.
 4) 설치가 끝났으면 블렌더를 파일 없이 한 번 열어 달라고 나에게 말하고, 열었다고 하면 `studio ping` 으로 GUI 연결을 확인해.
+5) 마지막으로 선택 기능 "그림→3D(TripoSG)"를 설치할지 나에게 고르게 해 줘(클로드 코드면 선택지 창, 코덱스면 번호 선택). 먼저 `nvidia-smi` 로 NVIDIA GPU 와 VRAM 을 확인해서 결과를 같이 보여 주고, 선택지는 "설치 안 함(추천)" / "설치 — 개인 프로젝트 전용, NVIDIA VRAM 8GB 이상 필요" 두 개로 해. 설치를 고르면 7번 프롬프트대로 하고, 고르지 않으면 아무것도 하지 마.
 완료 기준: `studio status` 에서 blender.version 이 5.2 로 시작하고, blender_mcp_addon 경로가 있고, `studio ping` 이 mode gui 와 블렌더 버전을 보여 준다(블렌더를 안 열었다면 `studio --headless ping` 이 블렌더 경로를 보여 주면 된다).
 주의: 토큰·비밀번호를 나에게 묻거나 화면에 출력하지 마. 계정 연동은 4·5번 프롬프트에서 로그인 창으로 한다. 클로드 코드/코덱스를 다시 켜야 MCP 도구가 보인다는 것도 마지막에 알려 줘.
 ```
@@ -72,7 +73,9 @@ docs/06_분산렌더.md 를 읽고 그 문서의 설치·확인 순서대로 따
 완료 기준: 문서에 적힌 확인 방법(render_plan 결과 등)이 그대로 나온다.
 ```
 
-## 7. 이미지 → 3D (TripoSG)
+## 7. 이미지 → 3D (TripoSG) — 선택 기능, 개인 프로젝트 전용
+
+NVIDIA 그래픽카드 VRAM 8GB 이상이 필요하다. 회사·상업용이면 설치하지 않는다.
 
 ```text
 docs/07_TripoSG.md 를 읽고 그 문서의 설치·확인 순서대로 따라 설치해 줘. 엔비디아 GPU 가 없는 기기라면 문서의 원격 실행 방법을 안내해 줘.
